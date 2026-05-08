@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quick Typer — AI typing assistant for Windows</title>
+<meta name="description" content="A system-wide AI typing assistant for Windows. Press a hotkey, get smart suggestions, insert with Tab. Free for personal use." />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: #0a0e1a;
+  color: #e4e7f0;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   Background gradient orbs — drifting animation
+   ============================================================ */
+.orb {
+  position: fixed;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.orb-1 {
+  top: -300px;
+  right: -200px;
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, transparent 70%);
+  animation: drift-1 20s ease-in-out infinite;
+}
+
+.orb-2 {
+  bottom: -300px;
+  left: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.22) 0%, transparent 70%);
+  animation: drift-2 25s ease-in-out infinite;
+}
+
+.orb-3 {
+  top: 40%;
+  left: 50%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.12) 0%, transparent 70%);
+  animation: drift-3 30s ease-in-out infinite;
+}
+
+@keyframes drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, 80px) scale(1.1); }
+  66% { transform: translate(60px, -40px) scale(0.95); }
+}
+
+@keyframes drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(80px, -60px) scale(1.15); }
+}
+
+@keyframes drift-3 {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  33% { transform: translate(-30%, -70%) scale(1.2); }
+  66% { transform: translate(-70%, -30%) scale(0.9); }
+}
+
+/* Mouse-following gradient overlay (set via JS) */
+.mouse-glow {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(40px);
+  transform: translate(-50%, -50%);
+  transition: opacity 400ms ease;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+main, header, footer { position: relative; z-index: 1; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+header {
+  padding: 24px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  animation: fade-down 600ms ease-out;
+}
+
+@keyframes fade-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.logo-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+  background-size: 200% 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  animation: gradient-shift 4s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.nav-links {
+  display: flex;
+  gap: 28px;
+  font-size: 14px;
+}
+
+.nav-links a {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  transition: color 200ms ease;
+  position: relative;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #a78bfa;
+  transition: width 250ms ease;
+}
+
+.nav-links a:hover {
+  color: #fff;
+}
+
+.nav-links a:hover::after {
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+}
+
+/* ============================================================
+   Hero
+   ============================================================ */
+.hero {
+  padding: 100px 0 80px;
+  text-align: center;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 6px 14px;
+  border-radius: 100px;
+  font-size: 12px;
+  color: #c4b5fd;
+  margin-bottom: 24px;
+  font-weight: 500;
+  opacity: 0;
+  animation: fade-up 600ms ease-out 100ms forwards;
+}
+
+.hero-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a78bfa;
+  box-shadow: 0 0 10px #a78bfa;
+  animation: pulse-dot 2s ease infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+.hero h1 {
+  font-size: 62px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #b4b8c5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  min-height: 138px;
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  width: 4px;
+  height: 0.9em;
+  background: #a78bfa;
+  vertical-align: text-bottom;
+  margin-left: 4px;
+  animation: cursor-blink 0.8s infinite;
+  -webkit-text-fill-color: #a78bfa;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@media (max-width: 700px) {
+  .hero h1 { font-size: 42px; min-height: 92px; }
+  .hero { padding: 60px 0 50px; }
+}
+
+.hero-subtitle {
+  font-size: 19px;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 580px;
+  margin: 0 auto 44px;
+  line-height: 1.5;
+  opacity: 0;
+  animation: fade-up 600ms ease-out 1400ms forwards;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 52px;
+  opacity: 0;
+  animation: fade-up 600ms ease-out 1700ms forwards;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899, #8b5cf6, #6366f1);
+  background-size: 200% 100%;
+  color: white;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+  animation: shimmer 4s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 16px 40px rgba(139, 92, 246, 0.6);
+}
+
+.btn-primary:active {
+  transform: translateY(-1px) scale(1.01);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.btn-arrow {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 200ms ease;
+}
+
+.btn:hover .btn-arrow {
+  transform: translateX(3px);
+}
+
+.hero-meta {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  opacity: 0;
+  animation: fade-up 600ms ease-out 2000ms forwards;
+}
+
+.hero-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-meta-item::before {
+  content: '✓';
+  color: #34d399;
+  font-weight: bold;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Demo / Mockup
+   ============================================================ */
+.demo {
+  padding: 60px 0 100px;
+}
+
+.demo-frame {
+  background: #14141e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 0;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 700ms ease, transform 700ms ease;
+}
+
+.demo-frame.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.demo-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.demo-titlebar-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.demo-titlebar-dot:nth-child(1) { background: #ff5f57; }
+.demo-titlebar-dot:nth-child(2) { background: #febc2e; }
+.demo-titlebar-dot:nth-child(3) { background: #28c840; }
+
+.demo-titlebar-text {
+  margin-left: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'Consolas', 'SF Mono', monospace;
+}
+
+.demo-content {
+  padding: 36px;
+  position: relative;
+  min-height: 320px;
+}
+
+.demo-typing {
+  font-family: 'Consolas', 'SF Mono', monospace;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.demo-typing-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: #8b5cf6;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: cursor-blink 1s infinite;
+}
+
+.demo-popup {
+  margin-top: 28px;
+  background: #1a1a26;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+  padding: 18px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 30px rgba(139, 92, 246, 0.1);
+  transition: box-shadow 400ms ease;
+}
+
+.demo-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.demo-popup-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+  background-size: 200% 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  animation: gradient-shift 4s ease infinite;
+}
+
+.demo-popup-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  transition: opacity 200ms ease;
+}
+
+.demo-popup-subtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.demo-popup-subtitle::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+  animation: pulse-dot 1.5s ease infinite;
+}
+
+.demo-popup-body {
+  background: #25253a;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.6;
+  min-height: 70px;
+  transition: opacity 300ms ease;
+}
+
+.demo-popup-body.fading {
+  opacity: 0;
+}
+
+.demo-popup-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+kbd {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom-width: 2px;
+}
+
+.demo-popup-button {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  padding: 7px 16px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Section
+   ============================================================ */
+section {
+  padding: 80px 0;
+}
+
+.section-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #a78bfa;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.section-title {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin-bottom: 16px;
+  color: white;
+}
+
+.section-subtitle {
+  text-align: center;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 580px;
+  margin: 0 auto 56px;
+}
+
+@media (max-width: 700px) {
+  .section-title { font-size: 30px; }
+  section { padding: 60px 0; }
+}
+
+/* Reveal-on-scroll: applies to elements with .reveal class */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================================
+   Modes grid
+   ============================================================ */
+.modes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.mode-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 22px;
+  transition: all 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.mode-card.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.mode-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(139, 92, 246, 0.15);
+}
+
+.mode-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+  background-size: 200% 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25);
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mode-card:hover .mode-icon {
+  transform: scale(1.15) rotate(-5deg);
+  animation: gradient-shift 2s ease infinite;
+}
+
+.mode-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.mode-hotkey {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: 'Consolas', 'SF Mono', monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  margin-top: 2px;
+}
+
+.mode-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Stats counter section (between hero and demo)
+   ============================================================ */
+.stats {
+  padding: 40px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; }
+}
+
+.stat-num {
+  font-size: 36px;
+  font-weight: 700;
+  background: linear-gradient(180deg, #ffffff 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Setup steps
+   ============================================================ */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 40px;
+}
+
+.step {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 28px;
+  position: relative;
+  transition: all 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.step.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.step:hover {
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateY(-3px);
+}
+
+.step-num {
+  position: absolute;
+  top: -12px;
+  left: 24px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.step-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 8px;
+  margin-top: 4px;
+}
+
+.step-desc {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+}
+
+.step-desc a {
+  color: #a78bfa;
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+
+.step-desc a:hover {
+  color: #c4b5fd;
+  text-decoration: underline;
+}
+
+.step-desc code {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  font-family: 'Consolas', 'SF Mono', monospace;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #c4b5fd;
+}
+
+.callout {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-top: 24px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.callout-icon {
+  font-size: 20px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.callout-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fcd34d;
+  margin-bottom: 4px;
+}
+
+.callout-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Requirements
+   ============================================================ */
+.req-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.req-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 250ms ease;
+}
+
+.req-card:hover {
+  border-color: rgba(139, 92, 246, 0.25);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.req-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.req-value {
+  font-size: 14px;
+  color: white;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+footer {
+  padding: 50px 0 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 60px;
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.footer-links {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+}
+
+.footer-links a {
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+
+.footer-links a:hover {
+  color: white;
+}
+
+/* ============================================================
+   Respect prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .typewriter-cursor { display: none; }
+
+  .reveal, .mode-card, .step, .demo-frame {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+<div class="mouse-glow" id="mouseGlow"></div>
+
+<header>
+  <div class="container">
+    <nav class="nav">
+      <div class="logo">
+        <div class="logo-badge">⌨</div>
+        <span>Quick Typer</span>
+      </div>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#setup">Setup</a>
+        <a href="#requirements">Requirements</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">v1.0 · Released for Windows</div>
+
+      <h1><span id="typewriter"></span><span class="typewriter-cursor" id="cursor"></span></h1>
+
+      <p class="hero-subtitle">
+        Press a hotkey anywhere. Get smart AI suggestions powered by Gemini.
+        Insert with Tab. Works in Notepad, Chrome, Teams, Word — every app you use.
+      </p>
+
+      <div class="hero-actions">
+        <a href="https://github.com/YOUR_USERNAME/quick-typer/releases/latest/download/QuickTyper.exe" class="btn btn-primary">
+          <span>↓</span>
+          <span>Download for Windows</span>
+        </a>
+        <a href="#setup" class="btn btn-secondary">
+          <span>How to set up</span>
+          <span class="btn-arrow">→</span>
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        <span class="hero-meta-item">Free forever</span>
+        <span class="hero-meta-item">Windows 10/11</span>
+        <span class="hero-meta-item">~22 MB download</span>
+        <span class="hero-meta-item">No installation</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats reveal">
+    <div class="container">
+      <div class="stats-grid">
+        <div>
+          <div class="stat-num"><span class="counter" data-target="7">0</span></div>
+          <div class="stat-label">AI Modes</div>
+        </div>
+        <div>
+          <div class="stat-num"><span class="counter" data-target="23">0</span></div>
+          <div class="stat-label">Languages</div>
+        </div>
+        <div>
+          <div class="stat-num"><span class="counter" data-target="60">0</span><span style="font-size:24px;color:rgba(255,255,255,0.4);">s</span></div>
+          <div class="stat-label">Setup time</div>
+        </div>
+        <div>
+          <div class="stat-num">∞</div>
+          <div class="stat-label">Free forever</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="demo">
+    <div class="container">
+      <div class="demo-frame" id="demoFrame">
+        <div class="demo-titlebar">
+          <div class="demo-titlebar-dot"></div>
+          <div class="demo-titlebar-dot"></div>
+          <div class="demo-titlebar-dot"></div>
+          <span class="demo-titlebar-text" id="demoTitleText">notepad.exe — Email Draft</span>
+        </div>
+        <div class="demo-content">
+          <div class="demo-typing" id="demoTyping">
+            <span id="demoText">Hi team,<br /><br />
+            Quick update on the project — we've made good progress on the<br />
+            backend this week and</span><span class="demo-typing-cursor"></span>
+          </div>
+
+          <div class="demo-popup">
+            <div class="demo-popup-header">
+              <div class="demo-popup-icon" id="demoIcon">✍️</div>
+              <div>
+                <div class="demo-popup-title" id="demoTitle">Continue Writing</div>
+                <div class="demo-popup-subtitle">Powered by Gemini · Ready</div>
+              </div>
+            </div>
+            <div class="demo-popup-body" id="demoBody">testing is going well so far. I wanted to flag that we may need 2-3 extra days due to the database migration issue we found yesterday. Happy to discuss in tomorrow's standup.</div>
+            <div class="demo-popup-footer">
+              <span><kbd>Tab</kbd> insert</span>
+              <span class="demo-popup-button">Insert →</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-label">Features</div>
+        <h2 class="section-title">Seven AI modes, one hotkey each</h2>
+        <p class="section-subtitle">
+          Each hotkey runs a different AI prompt on your selected text or context.
+          Works system-wide in any Windows app.
+        </p>
+      </div>
+
+      <div class="modes-grid" id="modesGrid">
+        <div class="mode-card">
+          <div class="mode-icon">✍️</div>
+          <div class="mode-name">Continue Writing</div>
+          <div class="mode-hotkey">Ctrl + Space</div>
+          <div class="mode-desc">Autocomplete what you're writing — emails, docs, anything.</div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">💬</div>
+          <div class="mode-name">Draft Reply</div>
+          <div class="mode-hotkey">Ctrl + Shift + Space</div>
+          <div class="mode-desc">Generate a reply to the selected message or email.</div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">✨</div>
+          <div class="mode-name">Improve Writing</div>
+          <div class="mode-hotkey">Ctrl + Shift + I</div>
+          <div class="mode-desc">Polish grammar, tighten wording, fix flow of selected text.</div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">🌐</div>
+          <div class="mode-name">Translate</div>
+          <div class="mode-hotkey">Ctrl + Shift + T</div>
+          <div class="mode-desc">Translate selected text to any of 23 languages.</div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">📋</div>
+          <div class="mode-name">Summarize</div>
+          <div class="mode-hotkey">Ctrl + Shift + U</div>
+          <div class="mode-desc">TL;DR of any long selected text — articles, reports, threads.</div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">🤔</div>
+          <div class="mode-name">Explain</div>
+          <div class="mode-hotkey">Ctrl + Shift + E</div>
+          <div class="mode-desc">Explain jargon, code, acronyms, or unfamiliar concepts.</div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">🛠️</div>
+          <div class="mode-name">Fix Code</div>
+          <div class="mode-hotkey">Ctrl + Shift + F</div>
+          <div class="mode-desc">Detect and fix bugs in selected code — Python, JS, and more.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-label">Setup</div>
+        <h2 class="section-title">Up and running in 60 seconds</h2>
+        <p class="section-subtitle">
+          Three steps. You'll need a free Google AI Studio account.
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-title">Download &amp; run</div>
+          <div class="step-desc">
+            Click the download button at the top. Run <code>QuickTyper.exe</code> — no installation needed.
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-title">Get a free Gemini API key</div>
+          <div class="step-desc">
+            Visit <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>, sign in, click <strong>Create API key</strong>. Copy it (starts with <code>AIza…</code>).
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-title">Paste &amp; start</div>
+          <div class="step-desc">
+            On first launch, paste your key. Press <code>Ctrl+Space</code> in any app — the AI popup appears next to your cursor.
+          </div>
+        </div>
+      </div>
+
+      <div class="callout reveal">
+        <div class="callout-icon">⚠️</div>
+        <div>
+          <div class="callout-title">Windows might warn you when you first run it</div>
+          <div class="callout-text">
+            SmartScreen may say <em>"Windows protected your PC"</em> because the app isn't code-signed yet. Click <strong>More info</strong> → <strong>Run anyway</strong>. This is normal for indie apps.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="requirements">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-label">Requirements</div>
+        <h2 class="section-title">What you need</h2>
+        <p class="section-subtitle">
+          Designed to be lightweight and work on most Windows machines.
+        </p>
+      </div>
+
+      <div class="req-grid reveal">
+        <div class="req-card">
+          <div class="req-label">OS</div>
+          <div class="req-value">Windows 10 or 11</div>
+        </div>
+        <div class="req-card">
+          <div class="req-label">Disk</div>
+          <div class="req-value">~22 MB</div>
+        </div>
+        <div class="req-card">
+          <div class="req-label">RAM</div>
+          <div class="req-value">~80 MB while running</div>
+        </div>
+        <div class="req-card">
+          <div class="req-label">Internet</div>
+          <div class="req-value">Required (Gemini API)</div>
+        </div>
+        <div class="req-card">
+          <div class="req-label">Account</div>
+          <div class="req-value">Free Gemini API key</div>
+        </div>
+        <div class="req-card">
+          <div class="req-label">Permissions</div>
+          <div class="req-value">No admin needed</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-content">
+      <div class="footer-text">
+        Quick Typer · Built with care for Windows users · Free for personal &amp; team use
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/YOUR_USERNAME/quick-typer" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/YOUR_USERNAME/quick-typer/issues" target="_blank" rel="noopener">Report a bug</a>
+        <a href="https://github.com/YOUR_USERNAME/quick-typer/releases" target="_blank" rel="noopener">All versions</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ============================================================
+// 1. Typewriter effect for hero headline
+// ============================================================
+(function() {
+  const text = "AI typing assistant\nfor Windows";
+  const target = document.getElementById('typewriter');
+  const cursor = document.getElementById('cursor');
+  if (!target) return;
+
+  let i = 0;
+  function type() {
+    if (i < text.length) {
+      const ch = text.charAt(i);
+      if (ch === '\n') {
+        target.innerHTML += '<br />';
+      } else {
+        target.innerHTML += ch;
+      }
+      i++;
+      setTimeout(type, 45);
+    } else {
+      // Hide cursor after typing finishes (after a 1s pause)
+      setTimeout(() => {
+        if (cursor) cursor.style.display = 'none';
+      }, 1500);
+    }
+  }
+  setTimeout(type, 400);
+})();
+
+// ============================================================
+// 2. Mouse-following gradient glow
+// ============================================================
+(function() {
+  const glow = document.getElementById('mouseGlow');
+  if (!glow) return;
+
+  let targetX = window.innerWidth / 2;
+  let targetY = window.innerHeight / 2;
+  let currentX = targetX;
+  let currentY = targetY;
+
+  document.addEventListener('mousemove', (e) => {
+    targetX = e.clientX;
+    targetY = e.clientY;
+    glow.style.opacity = '1';
+  });
+
+  document.addEventListener('mouseleave', () => {
+    glow.style.opacity = '0';
+  });
+
+  function animate() {
+    currentX += (targetX - currentX) * 0.08;
+    currentY += (targetY - currentY) * 0.08;
+    glow.style.left = currentX + 'px';
+    glow.style.top = currentY + 'px';
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ============================================================
+// 3. Reveal-on-scroll using IntersectionObserver
+// ============================================================
+(function() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, {
+    threshold: 0.15,
+    rootMargin: '0px 0px -50px 0px'
+  });
+
+  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+  document.querySelectorAll('#demoFrame').forEach((el) => observer.observe(el));
+})();
+
+// ============================================================
+// 4. Mode cards stagger reveal
+// ============================================================
+(function() {
+  const cards = document.querySelectorAll('.mode-card');
+  if (!cards.length) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        const cardsArray = Array.from(cards);
+        cardsArray.forEach((card, idx) => {
+          setTimeout(() => card.classList.add('in-view'), idx * 80);
+        });
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.1 });
+
+  observer.observe(cards[0]);
+})();
+
+// ============================================================
+// 5. Step cards stagger reveal
+// ============================================================
+(function() {
+  const steps = document.querySelectorAll('.step');
+  if (!steps.length) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        steps.forEach((step, idx) => {
+          setTimeout(() => step.classList.add('in-view'), idx * 120);
+        });
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.1 });
+
+  observer.observe(steps[0]);
+})();
+
+// ============================================================
+// 6. Animated number counters
+// ============================================================
+(function() {
+  const counters = document.querySelectorAll('.counter');
+  if (!counters.length) return;
+
+  function animateCounter(el) {
+    const target = parseInt(el.dataset.target, 10);
+    const duration = 1500;
+    const startTime = performance.now();
+
+    function frame(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutQuart for a nice deceleration
+      const eased = 1 - Math.pow(1 - progress, 4);
+      el.textContent = Math.floor(target * eased);
+      if (progress < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        el.textContent = target;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        animateCounter(entry.target);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.5 });
+
+  counters.forEach((c) => observer.observe(c));
+})();
+
+// ============================================================
+// 7. Demo popup auto-loop — cycles through 3 different examples
+// ============================================================
+(function() {
+  const demoTitle  = document.getElementById('demoTitle');
+  const demoIcon   = document.getElementById('demoIcon');
+  const demoBody   = document.getElementById('demoBody');
+  const demoText   = document.getElementById('demoText');
+  const titleText  = document.getElementById('demoTitleText');
+  if (!demoBody) return;
+
+  const examples = [
+    {
+      app: "notepad.exe — Email Draft",
+      typed: "Hi team,<br /><br />Quick update on the project — we've made good progress on the<br />backend this week and",
+      mode: "Continue Writing",
+      icon: "✍️",
+      output: "testing is going well so far. I wanted to flag that we may need 2-3 extra days due to the database migration issue we found yesterday. Happy to discuss in tomorrow's standup."
+    },
+    {
+      app: "Microsoft Teams — Chat",
+      typed: "Selected: <span style='background:rgba(139,92,246,0.2); padding:1px 4px; border-radius:3px;'>Hola, ¿cómo estás? Espero que tengas un buen día.</span>",
+      mode: "Translate (English)",
+      icon: "🌐",
+      output: "Hello, how are you? I hope you have a good day."
+    },
+    {
+      app: "VS Code — main.py",
+      typed: "Selected: <span style='background:rgba(139,92,246,0.2); padding:1px 4px; border-radius:3px; font-family:Consolas,monospace;'>def add(a, b)<br />&nbsp;&nbsp;return a+b</span>",
+      mode: "Fix Code",
+      icon: "🛠️",
+      output: "def add(a, b):\n    return a + b"
+    }
+  ];
+
+  let idx = 0;
+  function cycle() {
+    idx = (idx + 1) % examples.length;
+    const ex = examples[idx];
+
+    demoBody.classList.add('fading');
+
+    setTimeout(() => {
+      titleText.textContent = ex.app;
+      demoText.innerHTML = ex.typed;
+      demoIcon.textContent = ex.icon;
+      demoTitle.textContent = ex.mode;
+      demoBody.textContent = ex.output;
+      demoBody.classList.remove('fading');
+    }, 350);
+  }
+
+  setInterval(cycle, 5000);
+})();
+</script>
+</body>
+</html>
